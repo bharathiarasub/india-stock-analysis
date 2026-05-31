@@ -4,7 +4,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
-import json, os, time
+import json, os, time, requests
+
+try:
+    from nsepython import nse_eq
+    NSE_AVAILABLE = True
+except Exception:
+    NSE_AVAILABLE = False
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -147,31 +153,72 @@ with st.sidebar:
     st.caption("⚠️ Not financial advice. Consult a SEBI-registered advisor.")
 
 # ── Data fetching ──────────────────────────────────────────────────────────────
-@st.cache_data(ttl=300)  # Cache for 5 minutes
-def fetch_stock_data(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        hist = stock.history(period="1mo")
-        return info, hist
-    except:
-        return {}, pd.DataFrame()
+def _nse_symbol(ticker):
+    """Strip .NS / .BO suffix to get NSE symbol."""
+    return ticker.replace(".NS", "").replace(".BO", "")
 
 @st.cache_data(ttl=300)
 def fetch_price(ticker):
+    """Try NSEpython first, fall back to yfinance."""
+    symbol = _nse_symbol(ticker)
+    if NSE_AVAILABLE:
+        try:
+            data = nse_eq(symbol)
+            price = float(data["priceInfo"]["lastPrice"])
+            prev  = float(data["priceInfo"]["previousClose"])
+            chg   = ((price - prev) / prev) * 100
+            return round(price, 2), round(chg, 2)
+        except Exception:
+            pass
+    # yfinance fallback
     try:
-        t = yf.Ticker(ticker)
-        hist = t.history(period="2d")
+        hist = yf.Ticker(ticker).history(period="2d")
         if len(hist) >= 2:
             curr = hist['Close'].iloc[-1]
             prev = hist['Close'].iloc[-2]
-            chg = ((curr - prev) / prev) * 100
-            return round(curr, 2), round(chg, 2)
+            return round(curr, 2), round(((curr - prev) / prev) * 100, 2)
         elif len(hist) == 1:
             return round(hist['Close'].iloc[-1], 2), 0.0
-    except:
+    except Exception:
         pass
     return None, None
+
+@st.cache_data(ttl=300)
+def fetch_stock_data(ticker):
+    """Return (info_dict, history_df). Info built from NSEpython where possible."""
+    symbol = _nse_symbol(ticker)
+    info = {}
+    if NSE_AVAILABLE:
+        try:
+            data = nse_eq(symbol)
+            pi = data.get("priceInfo", {})
+            md = data.get("metadata", {})
+            info = {
+                "currentPrice":       pi.get("lastPrice"),
+                "previousClose":      pi.get("previousClose"),
+                "fiftyTwoWeekHigh":   pi.get("weekHighLow", {}).get("max"),
+                "fiftyTwoWeekLow":    pi.get("weekHighLow", {}).get("min"),
+                "marketCap":          md.get("pdSectorPe"),   # not available; placeholder
+                "trailingPE":         None,
+                "dividendYield":      None,
+                "returnOnEquity":     None,
+                "beta":               None,
+                "longBusinessSummary": md.get("pdSectorInd", ""),
+            }
+        except Exception:
+            pass
+    # Always fetch history from yfinance (price charts)
+    try:
+        hist = yf.Ticker(ticker).history(period="1mo")
+    except Exception:
+        hist = pd.DataFrame()
+    # If NSE gave nothing, try yfinance info too
+    if not info:
+        try:
+            info = yf.Ticker(ticker).info
+        except Exception:
+            pass
+    return info, hist
 
 # ── Auto refresh ──────────────────────────────────────────────────────────────
 if auto_refresh:
