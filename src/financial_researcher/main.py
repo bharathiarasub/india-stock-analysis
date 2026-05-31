@@ -37,11 +37,28 @@ TICKER_MAP = {
     "Larsen & Toubro":              "LT.NS",
     "Oil & Natural Gas Corp":       "ONGC.NS",
     "Adani Ports & SEZ":            "ADANIPORTS.NS",
+    "HUL":                          "HINDUNILVR.NS",
+    "Life Insurance Corporation":   "LICI.NS",
+    "LIC":                          "LICI.NS",
+    "Life Insurance Corporation of India": "LICI.NS",
+    "Sun Pharma":                   "SUNPHARMA.NS",
+    "M&M":                          "M&M.NS",
+    "L&T":                          "LT.NS",
+    "ONGC":                         "ONGC.NS",
+    "SBI":                          "SBIN.NS",
+    "TCS":                          "TCS.NS",
 }
 
 def fetch_stock_metrics(name: str) -> dict:
     """Fetch key stock metrics via yfinance. Returns empty dict on failure."""
     ticker = TICKER_MAP.get(name)
+    if not ticker:
+        # Fuzzy match: find the closest key in TICKER_MAP
+        name_lower = name.lower()
+        for key, val in TICKER_MAP.items():
+            if key.lower() in name_lower or name_lower in key.lower():
+                ticker = val
+                break
     if not ticker:
         return {}
     try:
