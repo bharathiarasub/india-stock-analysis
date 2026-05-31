@@ -1,5 +1,4 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -7,7 +6,7 @@ from datetime import datetime, timedelta
 import json, os, time, requests
 
 try:
-    from nsepython import nse_eq
+    from nsepython import nse_eq, nse_eq_history
     NSE_AVAILABLE = True
 except Exception:
     NSE_AVAILABLE = False
@@ -159,7 +158,7 @@ def _nse_symbol(ticker):
 
 @st.cache_data(ttl=300)
 def fetch_price(ticker):
-    """Try NSEpython first, fall back to yfinance."""
+    """Fetch live price from NSE."""
     symbol = _nse_symbol(ticker)
     if NSE_AVAILABLE:
         try:
@@ -170,55 +169,58 @@ def fetch_price(ticker):
             return round(price, 2), round(chg, 2)
         except Exception:
             pass
-    # yfinance fallback
-    try:
-        hist = yf.Ticker(ticker).history(period="2d")
-        if len(hist) >= 2:
-            curr = hist['Close'].iloc[-1]
-            prev = hist['Close'].iloc[-2]
-            return round(curr, 2), round(((curr - prev) / prev) * 100, 2)
-        elif len(hist) == 1:
-            return round(hist['Close'].iloc[-1], 2), 0.0
-    except Exception:
-        pass
     return None, None
 
 @st.cache_data(ttl=300)
 def fetch_stock_data(ticker):
-    """Return (info_dict, history_df). Info built from NSEpython where possible."""
+    """Return (info_dict, history_df) from NSE only."""
     symbol = _nse_symbol(ticker)
     info = {}
+    hist = pd.DataFrame()
     if NSE_AVAILABLE:
         try:
             data = nse_eq(symbol)
             pi = data.get("priceInfo", {})
             md = data.get("metadata", {})
             info = {
-                "currentPrice":       pi.get("lastPrice"),
-                "previousClose":      pi.get("previousClose"),
-                "fiftyTwoWeekHigh":   pi.get("weekHighLow", {}).get("max"),
-                "fiftyTwoWeekLow":    pi.get("weekHighLow", {}).get("min"),
-                "marketCap":          md.get("pdSectorPe"),   # not available; placeholder
-                "trailingPE":         None,
-                "dividendYield":      None,
-                "returnOnEquity":     None,
-                "beta":               None,
+                "currentPrice":        pi.get("lastPrice"),
+                "previousClose":       pi.get("previousClose"),
+                "fiftyTwoWeekHigh":    pi.get("weekHighLow", {}).get("max"),
+                "fiftyTwoWeekLow":     pi.get("weekHighLow", {}).get("min"),
+                "marketCap":           None,
+                "trailingPE":          None,
+                "dividendYield":       None,
+                "returnOnEquity":      None,
+                "beta":                None,
                 "longBusinessSummary": md.get("pdSectorInd", ""),
             }
         except Exception:
             pass
-    # Always fetch history from yfinance (price charts)
-    try:
-        hist = yf.Ticker(ticker).history(period="1mo")
-    except Exception:
-        hist = pd.DataFrame()
-    # If NSE gave nothing, try yfinance info too
-    if not info:
         try:
-            info = yf.Ticker(ticker).info
+            end = datetime.today().strftime("%d-%m-%Y")
+            start = (datetime.today() - timedelta(days=30)).strftime("%d-%m-%Y")
+            hist = nse_eq_history(symbol, start, end)
+            if hist is not None and not hist.empty:
+                hist.index = pd.to_datetime(hist.index)
+        except Exception:
+            hist = pd.DataFrame()
+    return info, hist
+
+@st.cache_data(ttl=300)
+def fetch_history(ticker, days=180):
+    """Fetch price history from NSE for charts."""
+    symbol = _nse_symbol(ticker)
+    if NSE_AVAILABLE:
+        try:
+            end = datetime.today().strftime("%d-%m-%Y")
+            start = (datetime.today() - timedelta(days=days)).strftime("%d-%m-%Y")
+            hist = nse_eq_history(symbol, start, end)
+            if hist is not None and not hist.empty:
+                hist.index = pd.to_datetime(hist.index)
+                return hist
         except Exception:
             pass
-    return info, hist
+    return pd.DataFrame()
 
 # ── Auto refresh ──────────────────────────────────────────────────────────────
 if auto_refresh:
@@ -413,8 +415,9 @@ elif page == "🔍 Company Deep Dive":
     # Price chart
     st.markdown("---")
     period = st.selectbox("Chart period", ["1mo", "3mo", "6mo", "1y", "2y"], index=2)
+    period_days = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "2y": 730}
     with st.spinner("Loading chart..."):
-        hist_period = yf.Ticker(c['ticker']).history(period=period)
+        hist_period = fetch_history(c['ticker'], days=period_days[period])
 
     if not hist_period.empty:
         fig = go.Figure()
@@ -505,6 +508,7 @@ elif page == "📈 Live Charts":
         default=[c["name"] for c in COMPANIES[:5]]
     )
     period = st.select_slider("Period", ["1mo","3mo","6mo","1y","2y"], value="6mo")
+    period_days = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "2y": 730}
 
     if selected_companies:
         fig = go.Figure()
@@ -512,7 +516,7 @@ elif page == "📈 Live Charts":
             for name in selected_companies:
                 c = next((x for x in COMPANIES if x["name"] == name), None)
                 if c:
-                    hist = yf.Ticker(c['ticker']).history(period=period)
+                    hist = fetch_history(c['ticker'], days=period_days[period])
                     if not hist.empty:
                         # Normalise to 100 for comparison
                         normalised = (hist['Close'] / hist['Close'].iloc[0]) * 100
