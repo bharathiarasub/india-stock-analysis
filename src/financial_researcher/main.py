@@ -216,20 +216,24 @@ def save_ranking_json(report_text: str):
         except Exception:
             continue
 
-    # Extract portfolio allocation table
+    # Extract portfolio allocation — supports both table and bullet list formats
     portfolio = []
-    alloc_pattern = re.compile(r'\|\s*([^|]+?)\s*\|\s*(\d+)\s*\|')
     in_portfolio = False
+    table_pattern = re.compile(r'\|\s*([^|]+?)\s*\|\s*(\d+)\s*\|')
+    bullet_pattern = re.compile(r'[-*]\s*([^:]+?):\s*(\d+)\s*%')
     for line in report_text.splitlines():
         if "DIVERSIFIED PORTFOLIO" in line.upper() or "PORTFOLIO SUGGESTION" in line.upper():
             in_portfolio = True
+        if "STOCKS TO WATCH" in line.upper() or "DISCLAIMER" in line.upper():
+            in_portfolio = False
         if in_portfolio:
-            m = alloc_pattern.match(line)
+            m = table_pattern.match(line)
             if m and not m.group(1).strip().lower().startswith("company"):
-                portfolio.append({
-                    "name": m.group(1).strip(),
-                    "allocation": int(m.group(2)),
-                })
+                portfolio.append({"name": m.group(1).strip(), "allocation": int(m.group(2))})
+                continue
+            m = bullet_pattern.match(line.strip())
+            if m:
+                portfolio.append({"name": m.group(1).strip(), "allocation": int(m.group(2))})
 
     # Fetch live stock metrics for each ranked company
     print("\nFetching stock metrics from yfinance...")
