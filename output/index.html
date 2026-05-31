@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>India Top 25 — Stock Investment Analysis</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #1565c0 100%);
+    padding: 40px 24px 32px;
+    text-align: center;
+    border-bottom: 2px solid #1e40af;
+  }
+  .header h1 { font-size: 2rem; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+  .header p { color: #93c5fd; margin-top: 6px; font-size: 0.95rem; }
+  .badge {
+    display: inline-block; background: #1e3a8a; color: #60a5fa;
+    border: 1px solid #3b82f6; border-radius: 20px;
+    padding: 4px 14px; font-size: 0.78rem; margin-top: 12px; font-weight: 600;
+  }
+
+  /* Disclaimer */
+  .disclaimer {
+    background: #1c1a10; border: 1px solid #854d0e; border-left: 4px solid #f59e0b;
+    margin: 20px auto; max-width: 1100px; border-radius: 8px;
+    padding: 12px 18px; font-size: 0.82rem; color: #fbbf24;
+  }
+
+  /* Stats strip */
+  .stats {
+    display: flex; justify-content: center; gap: 16px;
+    flex-wrap: wrap; padding: 20px 24px; max-width: 1100px; margin: 0 auto;
+  }
+  .stat-card {
+    background: #1e2132; border: 1px solid #2d3748; border-radius: 12px;
+    padding: 16px 28px; text-align: center; flex: 1; min-width: 140px;
+  }
+  .stat-card .num { font-size: 2rem; font-weight: 700; color: #60a5fa; }
+  .stat-card .lbl { font-size: 0.78rem; color: #94a3b8; margin-top: 4px; }
+
+  /* Main layout */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; }
+
+  /* Section headers */
+  .section-title {
+    font-size: 1.1rem; font-weight: 700; color: #93c5fd;
+    border-bottom: 1px solid #1e40af; padding-bottom: 8px;
+    margin: 32px 0 16px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+
+  /* Top 10 cards */
+  .top10-grid { display: flex; flex-direction: column; gap: 12px; }
+  .stock-card {
+    background: #1a1f2e; border: 1px solid #2d3748; border-radius: 12px;
+    padding: 18px 20px; display: grid;
+    grid-template-columns: 52px 1fr auto;
+    gap: 0 16px; align-items: center;
+    transition: border-color 0.2s;
+  }
+  .stock-card:hover { border-color: #3b82f6; }
+  .stock-card.rank-1 { border-left: 4px solid #f59e0b; }
+  .stock-card.rank-2 { border-left: 4px solid #9ca3af; }
+  .stock-card.rank-3 { border-left: 4px solid #b45309; }
+  .stock-card .rank-badge {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: #0d47a1; color: #93c5fd;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700;
+  }
+  .rank-1 .rank-badge { background: #78350f; color: #fbbf24; }
+  .rank-2 .rank-badge { background: #374151; color: #d1d5db; }
+  .rank-3 .rank-badge { background: #451a03; color: #d97706; }
+
+  .stock-info h3 { font-size: 1rem; font-weight: 600; color: #e2e8f0; }
+  .stock-info .thesis { font-size: 0.83rem; color: #94a3b8; margin-top: 4px; line-height: 1.4; }
+  .stock-info .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .tag {
+    font-size: 0.72rem; padding: 2px 10px; border-radius: 20px;
+    font-weight: 600; border: 1px solid;
+  }
+  .tag-horizon { background: #0c2a4a; color: #60a5fa; border-color: #1d4ed8; }
+  .tag-profile { background: #0c2a1a; color: #4ade80; border-color: #16a34a; }
+  .tag-risk-medium { background: #2a1f0c; color: #fbbf24; border-color: #d97706; }
+  .tag-risk-low { background: #0c2a1a; color: #4ade80; border-color: #16a34a; }
+  .tag-risk-high { background: #2a0c0c; color: #f87171; border-color: #dc2626; }
+
+  .stock-score { text-align: right; }
+  .stock-score .score-num { font-size: 1.6rem; font-weight: 700; color: #60a5fa; }
+  .stock-score .score-denom { font-size: 0.8rem; color: #475569; }
+  .stock-score .risk-label { font-size: 0.75rem; margin-top: 4px; }
+
+  .risk-key { font-size: 0.78rem; color: #f87171; margin-top: 6px; }
+  .risk-key span { color: #64748b; }
+
+  /* Score bar */
+  .score-bar-wrap { margin-top: 6px; }
+  .score-bar-bg { background: #1e293b; border-radius: 4px; height: 5px; width: 80px; margin-left: auto; }
+  .score-bar-fill { height: 5px; border-radius: 4px; background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+
+  /* Portfolio table */
+  .portfolio-table { width: 100%; border-collapse: collapse; border-radius: 10px; overflow: hidden; }
+  .portfolio-table th {
+    background: #1e3a8a; color: #bfdbfe; font-size: 0.8rem;
+    padding: 10px 16px; text-align: left; font-weight: 600;
+  }
+  .portfolio-table td { padding: 10px 16px; font-size: 0.88rem; border-bottom: 1px solid #1e2132; }
+  .portfolio-table tr:nth-child(even) td { background: #161b2e; }
+  .portfolio-table tr:last-child td { border-bottom: none; }
+  .alloc-bar-bg { background: #1e293b; border-radius: 4px; height: 8px; width: 100%; margin-top: 4px; }
+  .alloc-bar-fill { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #2563eb, #60a5fa); }
+
+  /* Sector pills */
+  .sector-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .sector-pill {
+    background: #1e2132; border: 1px solid #2d3748; border-radius: 10px;
+    padding: 10px 18px; font-size: 0.85rem;
+  }
+  .sector-pill strong { color: #60a5fa; display: block; font-size: 1rem; }
+
+  /* Watch list */
+  .watch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .watch-card {
+    background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .watch-card h4 { font-size: 0.9rem; color: #e2e8f0; }
+  .watch-card p { font-size: 0.78rem; color: #94a3b8; margin-top: 6px; line-height: 1.4; }
+  .watch-num { font-size: 0.72rem; color: #4b5563; margin-bottom: 4px; }
+
+  /* Footer */
+  .footer {
+    background: #0d1117; border-top: 1px solid #1e2132;
+    text-align: center; padding: 24px;
+    font-size: 0.78rem; color: #475569;
+  }
+  .footer a { color: #60a5fa; text-decoration: none; }
+
+  /* Donut chart */
+  .chart-wrap { display: flex; align-items: center; gap: 32px; flex-wrap: wrap; margin-top: 8px; }
+  .legend { display: flex; flex-direction: column; gap: 6px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🇮🇳 India Top 25 — Investment Analysis</h1>
+  <p>AI-powered stock research across India's largest companies by market cap</p>
+  <div class="badge">⚡ Powered by CrewAI · GPT-4o-mini · May 2026</div>
+</div>
+
+<div class="disclaimer">
+  ⚠️ <strong>Disclaimer:</strong> This is AI-generated analysis for educational purposes only. It is not personal financial advice.
+  Always consult a <strong>SEBI-registered investment advisor</strong> before making any investment decisions.
+</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat-card"><div class="num">25</div><div class="lbl">Companies Analysed</div></div>
+  <div class="stat-card"><div class="num">10</div><div class="lbl">Top Picks</div></div>
+  <div class="stat-card"><div class="num">6</div><div class="lbl">Sectors Covered</div></div>
+  <div class="stat-card"><div class="num">43<span style="font-size:1rem;color:#94a3b8">/50</span></div><div class="lbl">Highest Score</div></div>
+</div>
+
+<div class="container">
+
+  <!-- TOP 10 -->
+  <div class="section-title">🏆 Top 10 Ranked Stocks</div>
+  <div class="top10-grid">
+
+    <!-- Rank 1 -->
+    <div class="stock-card rank-1">
+      <div class="rank-badge">1</div>
+      <div class="stock-info">
+        <h3>HDFC Bank</h3>
+        <div class="thesis">Strong fundamentals and a leading market position in Indian banking.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Long (3+ yr)</span>
+          <span class="tag tag-profile">Moderate</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Regulatory risk related to RBI policies.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">43</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:86%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Rank 2 -->
+    <div class="stock-card rank-2">
+      <div class="rank-badge">2</div>
+      <div class="stock-info">
+        <h3>Bajaj Finance</h3>
+        <div class="thesis">High growth potential in the lending space, benefiting from fintech trends.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Medium (1-3 yr)</span>
+          <span class="tag tag-profile">Moderate</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Regulatory constraints from RBI on lending.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">43</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:86%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Rank 3 -->
+    <div class="stock-card rank-3">
+      <div class="rank-badge">3</div>
+      <div class="stock-info">
+        <h3>Hindustan Unilever</h3>
+        <div class="thesis">Strong brand portfolio with resilience in consumer products.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Long (3+ yr)</span>
+          <span class="tag tag-profile">Conservative</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Competition from emerging local brands.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">42</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:84%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Rank 4 -->
+    <div class="stock-card">
+      <div class="rank-badge">4</div>
+      <div class="stock-info">
+        <h3>Maruti Suzuki India</h3>
+        <div class="thesis">Leading player in the auto sector with strong demand recovery.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Medium (1-3 yr)</span>
+          <span class="tag tag-profile">Moderate</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Emission regulations and EV competition.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">42</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:84%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Rank 5 -->
+    <div class="stock-card">
+      <div class="rank-badge">5</div>
+      <div class="stock-info">
+        <h3>UltraTech Cement</h3>
+        <div class="thesis">Key player in cement with growth linkages to infrastructure development.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Long (3+ yr)</span>
+          <span class="tag tag-profile">Moderate</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Fluctuations in construction demand.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">38</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:76%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Rank 6 -->
+    <div class="stock-card">
+      <div class="rank-badge">6</div>
+      <div class="stock-info">
+        <h3>Bharti Airtel</h3>
+        <div class="thesis">Strong telecommunications infrastructure and diversified services.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Medium (1-3 yr)</span>
+          <span class="tag tag-profile">Moderate</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Pricing wars in the telecom sector.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">38</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:76%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Rank 7 -->
+    <div class="stock-card">
+      <div class="rank-badge">7</div>
+      <div class="stock-info">
+        <h3>ICICI Bank</h3>
+        <div class="thesis">Good asset management and growth prospects in retail banking.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Medium (1-3 yr)</span>
+          <span class="tag tag-profile">Moderate</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Non-Performing Assets (NPA) levels.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">38</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:76%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Rank 8 -->
+    <div class="stock-card">
+      <div class="rank-badge">8</div>
+      <div class="stock-info">
+        <h3>JSW Steel</h3>
+        <div class="thesis">Solid operator in a cyclical industry with global demand linkages.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Medium (1-3 yr)</span>
+          <span class="tag tag-profile">Moderate</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Volatility in steel prices.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">35</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:70%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Rank 9 -->
+    <div class="stock-card">
+      <div class="rank-badge">9</div>
+      <div class="stock-info">
+        <h3>NTPC Limited</h3>
+        <div class="thesis">Leading power generator, transitioning to renewables for future growth.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Long (3+ yr)</span>
+          <span class="tag tag-profile">Conservative</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Regulatory issues concerning environmental norms.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">35</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:70%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Rank 10 -->
+    <div class="stock-card">
+      <div class="rank-badge">10</div>
+      <div class="stock-info">
+        <h3>Larsen &amp; Toubro</h3>
+        <div class="thesis">Established player in infrastructure with multiple project streams.</div>
+        <div class="tags">
+          <span class="tag tag-horizon">Long (3+ yr)</span>
+          <span class="tag tag-profile">Moderate</span>
+          <span class="tag tag-risk-medium">Medium Risk</span>
+        </div>
+        <div class="risk-key"><span>⚠ Key Risk: </span>Delays in project execution could impact revenues.</div>
+      </div>
+      <div class="stock-score">
+        <div class="score-num">35</div><div class="score-denom">/50</div>
+        <div class="score-bar-wrap"><div class="score-bar-bg"><div class="score-bar-fill" style="width:70%"></div></div></div>
+      </div>
+    </div>
+
+  </div><!-- /top10 -->
+
+  <!-- SECTOR BREAKDOWN -->
+  <div class="section-title">🏭 Sector Breakdown</div>
+  <div class="sector-grid">
+    <div class="sector-pill"><strong>Banking</strong>HDFC Bank, ICICI Bank</div>
+    <div class="sector-pill"><strong>NBFC / Fintech</strong>Bajaj Finance</div>
+    <div class="sector-pill"><strong>Consumer Staples</strong>Hindustan Unilever</div>
+    <div class="sector-pill"><strong>Automobile</strong>Maruti Suzuki</div>
+    <div class="sector-pill"><strong>Infrastructure</strong>UltraTech Cement, L&T</div>
+    <div class="sector-pill"><strong>Telecom</strong>Bharti Airtel</div>
+    <div class="sector-pill"><strong>Metals</strong>JSW Steel</div>
+    <div class="sector-pill"><strong>Energy / Power</strong>NTPC Limited</div>
+  </div>
+
+  <!-- PORTFOLIO ALLOCATION -->
+  <div class="section-title">💼 Suggested Portfolio — Moderate Risk Investor</div>
+  <table class="portfolio-table">
+    <thead>
+      <tr><th>Company</th><th>Sector</th><th>Allocation</th><th style="width:200px">Weight</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>HDFC Bank</td><td>Banking</td><td><strong>15%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:100%"></div></div></td></tr>
+      <tr><td>Bajaj Finance</td><td>NBFC</td><td><strong>15%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:100%"></div></div></td></tr>
+      <tr><td>Hindustan Unilever</td><td>Consumer Staples</td><td><strong>10%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:67%"></div></div></td></tr>
+      <tr><td>Maruti Suzuki India</td><td>Automobile</td><td><strong>10%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:67%"></div></div></td></tr>
+      <tr><td>UltraTech Cement</td><td>Infrastructure</td><td><strong>10%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:67%"></div></div></td></tr>
+      <tr><td>Bharti Airtel</td><td>Telecom</td><td><strong>10%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:67%"></div></div></td></tr>
+      <tr><td>ICICI Bank</td><td>Banking</td><td><strong>10%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:67%"></div></div></td></tr>
+      <tr><td>JSW Steel</td><td>Metals</td><td><strong>8%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:53%"></div></div></td></tr>
+      <tr><td>NTPC Limited</td><td>Energy</td><td><strong>7%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:47%"></div></div></td></tr>
+      <tr><td>Larsen &amp; Toubro</td><td>Infrastructure</td><td><strong>5%</strong></td><td><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:33%"></div></div></td></tr>
+    </tbody>
+  </table>
+
+  <!-- STOCKS TO WATCH -->
+  <div class="section-title">👁 Stocks to Watch (Ranks 11–15)</div>
+  <div class="watch-grid">
+    <div class="watch-card">
+      <div class="watch-num">#11</div>
+      <h4>Titan Company</h4>
+      <p>Strong brand presence in consumer goods with potential in watches and jewellery.</p>
+    </div>
+    <div class="watch-card">
+      <div class="watch-num">#12</div>
+      <h4>State Bank of India</h4>
+      <p>Largest public sector bank with recovery potential amid regulatory environments.</p>
+    </div>
+    <div class="watch-card">
+      <div class="watch-num">#13</div>
+      <h4>Hindalco Industries</h4>
+      <p>Solid groundwork in aluminium and copper despite cyclical challenges.</p>
+    </div>
+    <div class="watch-card">
+      <div class="watch-num">#14</div>
+      <h4>Sun Pharmaceutical</h4>
+      <p>Strong pipeline, but must navigate patent expiration risks carefully.</p>
+    </div>
+    <div class="watch-card">
+      <div class="watch-num">#15</div>
+      <h4>Oil &amp; Natural Gas Corp.</h4>
+      <p>Positioned in energy sector amid volatility, considering renewable investments.</p>
+    </div>
+  </div>
+
+  <!-- DISCLAIMER FULL -->
+  <div class="section-title">⚠️ Important Disclaimer</div>
+  <div class="disclaimer" style="margin: 0; max-width: 100%; font-size: 0.87rem; line-height: 1.6;">
+    This analysis is <strong>AI-generated educational content</strong> produced by a CrewAI multi-agent pipeline.
+    It should not be construed as personal financial advice, a solicitation to buy or sell securities,
+    or a guarantee of future performance. Financial markets are subject to inherent risks and uncertainties.
+    Past performance is not indicative of future results.
+    <br><br>
+    Investors are strongly advised to <strong>consult a SEBI-registered investment advisor</strong> before
+    making any investment decisions. Always conduct your own due diligence.
+  </div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  Generated by <strong>CrewAI Financial Research Pipeline</strong> · GPT-4o-mini ·
+  Data sourced from web research as of May 2026 ·
+  <a href="https://github.com/bharathiarasub/sap-fitgap-crew" target="_blank">GitHub</a>
+</div>
+
+</body>
+</html>

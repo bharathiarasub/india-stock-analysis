@@ -4,6 +4,9 @@ fundamental_scoring_task:
 
     {company_reports}
 
+    IMPORTANT: Always use the exact real company names from the reports.
+    Never use placeholder names like "Company A" or "Company B".
+
     For each company, analyse the report and score it on these 5 dimensions (1-10):
     1. Revenue & Earnings Growth — recent and projected
     2. Profitability — margins, ROE, ROA
@@ -46,7 +49,11 @@ risk_assessment_task:
 ranking_and_recommendation_task:
   description: >
     Using the fundamental scores and risk ratings, produce a final investment
-    analysis report with:
+    analysis report. IMPORTANT: Always use the exact real company names from
+    the research reports (e.g. "HDFC Bank", "Reliance Industries"). Never use
+    placeholder names like "Company A", "Company B".
+
+    The report must include:
 
     1. TOP 10 RANKED STOCKS
        For each, provide:
