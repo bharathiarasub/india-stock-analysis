@@ -1,0 +1,84 @@
+fundamental_scoring_task:
+  description: >
+    You have research reports on {num_companies} top Indian companies.
+
+    {company_reports}
+
+    For each company, analyse the report and score it on these 5 dimensions (1-10):
+    1. Revenue & Earnings Growth — recent and projected
+    2. Profitability — margins, ROE, ROA
+    3. Balance Sheet Strength — debt levels, cash position
+    4. Competitive Moat — market position, brand, switching costs
+    5. Sector Outlook — tailwinds/headwinds for the sector in India
+
+    Also note the current valuation sentiment (Overvalued / Fair / Undervalued)
+    based on the report context.
+
+    Format as a table:
+    Company | Growth | Profitability | Balance Sheet | Moat | Sector | Total/50 | Valuation
+  expected_output: >
+    A scoring table for all {num_companies} companies with scores across all
+    5 dimensions, a total score out of 50, and valuation sentiment.
+    Sorted by total score descending.
+  agent: fundamental_analyst
+
+risk_assessment_task:
+  description: >
+    Using the same company reports, assess the top 3 risks for each company
+    and assign an overall risk rating.
+
+    Risk categories to consider:
+    - Regulatory / Policy risk (RBI, SEBI, govt intervention)
+    - Governance / Promoter risk
+    - Competitive / Disruption risk
+    - Macro / FX / Commodity risk
+    - Valuation / Market sentiment risk
+
+    Format:
+    Company | Risk 1 | Risk 2 | Risk 3 | Overall Risk Rating (Low/Medium/High)
+  expected_output: >
+    A risk table for all {num_companies} companies with top 3 risks and
+    overall risk rating for each.
+  agent: risk_analyst
+  context:
+    - fundamental_scoring_task
+
+ranking_and_recommendation_task:
+  description: >
+    Using the fundamental scores and risk ratings, produce a final investment
+    analysis report with:
+
+    1. TOP 10 RANKED STOCKS
+       For each, provide:
+       - Rank
+       - Company name
+       - Fundamental score (/50)
+       - Risk rating
+       - Investment horizon: Short (< 1 yr) / Medium (1-3 yr) / Long (3+ yr)
+       - Suitable for: Conservative / Moderate / Aggressive investor
+       - One-line investment thesis
+       - One key risk to watch
+
+    2. SECTOR BREAKDOWN
+       Which sectors are best represented in the top 10 and why.
+
+    3. DIVERSIFIED PORTFOLIO SUGGESTION
+       A sample allocation across the top 10 for a moderate-risk investor
+       (percentages should add to 100%).
+
+    4. STOCKS TO WATCH (ranks 11-15)
+       Companies that almost made the top 10 — worth monitoring.
+
+    5. DISCLAIMER
+       Prominent disclaimer that this is AI-generated educational analysis,
+       not personal financial advice. Recommend consulting a SEBI-registered
+       investment advisor before making any investment decisions.
+
+  expected_output: >
+    A complete, well-structured investment analysis report in Markdown covering
+    all 5 sections. Professional, clear, and with prominent disclaimer.
+  agent: portfolio_advisor
+  context:
+    - fundamental_scoring_task
+    - risk_assessment_task
+  output_file: output/STOCK_RANKING_REPORT.md

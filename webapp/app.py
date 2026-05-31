@@ -3,13 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
-import json, os, time, requests
-
-try:
-    from nsepython import nse_eq, nse_eq_history
-    NSE_AVAILABLE = True
-except Exception:
-    NSE_AVAILABLE = False
+import json, os, time
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -151,76 +145,29 @@ with st.sidebar:
     st.caption(f"📈 Market data: {datetime.now().strftime('%d %b %Y %H:%M')}")
     st.caption("⚠️ Not financial advice. Consult a SEBI-registered advisor.")
 
-# ── Data fetching ──────────────────────────────────────────────────────────────
-def _nse_symbol(ticker):
-    """Strip .NS / .BO suffix to get NSE symbol."""
-    return ticker.replace(".NS", "").replace(".BO", "")
+# ── Data helpers (read from JSON, no live API calls) ──────────────────────────
+def get_company_metrics(name):
+    """Return the pre-fetched metrics dict for a company from ranking.json."""
+    for c in AI_COMPANIES:
+        if c["name"] == name:
+            return c
+    return {}
 
-@st.cache_data(ttl=300)
-def fetch_price(ticker):
-    """Fetch live price from NSE."""
-    symbol = _nse_symbol(ticker)
-    if NSE_AVAILABLE:
-        try:
-            data = nse_eq(symbol)
-            price = float(data["priceInfo"]["lastPrice"])
-            prev  = float(data["priceInfo"]["previousClose"])
-            chg   = ((price - prev) / prev) * 100
-            return round(price, 2), round(chg, 2)
-        except Exception:
-            pass
-    return None, None
+def fmt_price(val):
+    return f"₹{val:,.2f}" if val else "N/A"
 
-@st.cache_data(ttl=300)
-def fetch_stock_data(ticker):
-    """Return (info_dict, history_df) from NSE only."""
-    symbol = _nse_symbol(ticker)
-    info = {}
-    hist = pd.DataFrame()
-    if NSE_AVAILABLE:
-        try:
-            data = nse_eq(symbol)
-            pi = data.get("priceInfo", {})
-            md = data.get("metadata", {})
-            info = {
-                "currentPrice":        pi.get("lastPrice"),
-                "previousClose":       pi.get("previousClose"),
-                "fiftyTwoWeekHigh":    pi.get("weekHighLow", {}).get("max"),
-                "fiftyTwoWeekLow":     pi.get("weekHighLow", {}).get("min"),
-                "marketCap":           None,
-                "trailingPE":          None,
-                "dividendYield":       None,
-                "returnOnEquity":      None,
-                "beta":                None,
-                "longBusinessSummary": md.get("pdSectorInd", ""),
-            }
-        except Exception:
-            pass
-        try:
-            end = datetime.today().strftime("%d-%m-%Y")
-            start = (datetime.today() - timedelta(days=30)).strftime("%d-%m-%Y")
-            hist = nse_eq_history(symbol, start, end)
-            if hist is not None and not hist.empty:
-                hist.index = pd.to_datetime(hist.index)
-        except Exception:
-            hist = pd.DataFrame()
-    return info, hist
+def fmt_pct(val):
+    return f"{val*100:.2f}%" if val else "N/A"
 
-@st.cache_data(ttl=300)
-def fetch_history(ticker, days=180):
-    """Fetch price history from NSE for charts."""
-    symbol = _nse_symbol(ticker)
-    if NSE_AVAILABLE:
-        try:
-            end = datetime.today().strftime("%d-%m-%Y")
-            start = (datetime.today() - timedelta(days=days)).strftime("%d-%m-%Y")
-            hist = nse_eq_history(symbol, start, end)
-            if hist is not None and not hist.empty:
-                hist.index = pd.to_datetime(hist.index)
-                return hist
-        except Exception:
-            pass
-    return pd.DataFrame()
+def fmt_ratio(val, suffix="x"):
+    return f"{val:.1f}{suffix}" if val else "N/A"
+
+def fmt_cap(val):
+    if not val:
+        return "N/A"
+    if val >= 1e12:
+        return f"₹{val/1e12:.2f}T"
+    return f"₹{val/1e9:.0f}B"
 
 # ── Auto refresh ──────────────────────────────────────────────────────────────
 if auto_refresh:
@@ -336,12 +283,11 @@ elif page == "🏆 Top 10 Rankings":
                 st.metric("AI Score", f"{c['score']}/50")
                 score_pct = c['score'] / 50
                 st.progress(score_pct)
-                # Live price
-                with st.spinner(""):
-                    price, chg = fetch_price(c['ticker'])
+                m = get_company_metrics(c['name'])
+                price = m.get("price")
+                chg   = m.get("change_pct")
                 if price:
-                    delta_str = f"{chg:+.2f}%"
-                    st.metric("Live Price", f"₹{price:,.2f}", delta=delta_str)
+                    st.metric("Price", fmt_price(price), delta=f"{chg:+.2f}%" if chg is not None else None)
             st.divider()
 
 
@@ -356,39 +302,35 @@ elif page == "🔍 Company Deep Dive":
     c = next(x for x in COMPANIES if x["name"] == selected)
 
     st.markdown(f"## {c['name']}")
-    st.caption(f"Rank #{c['rank']} · {c['sector']} · {c['ticker']}")
+    st.caption(f"Rank #{c['rank']} · {c['sector']} · {c.get('ticker','')}")
 
-    # Live data
-    with st.spinner("Fetching live market data..."):
-        info, hist = fetch_stock_data(c['ticker'])
+    m = get_company_metrics(c['name'])
+    fetched_at = m.get("fetched_at", AI_GENERATED)
+    st.caption(f"📊 Market data as of: {fetched_at}")
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        price = info.get('currentPrice') or info.get('regularMarketPrice')
-        st.metric("Current Price", f"₹{price:,.2f}" if price else "N/A")
+        price = m.get("price")
+        chg   = m.get("change_pct")
+        delta = f"{chg:+.2f}%" if chg is not None else None
+        st.metric("Current Price", fmt_price(price), delta=delta)
     with col2:
-        mktcap = info.get('marketCap')
-        if mktcap:
-            st.metric("Market Cap", f"₹{mktcap/1e12:.2f}T")
-        else:
-            st.metric("Market Cap", "N/A")
+        st.metric("Market Cap", fmt_cap(m.get("market_cap")))
     with col3:
-        pe = info.get('trailingPE')
-        st.metric("P/E Ratio", f"{pe:.1f}x" if pe else "N/A")
+        st.metric("P/E Ratio", fmt_ratio(m.get("pe_ratio")))
     with col4:
-        div = info.get('dividendYield')
-        st.metric("Dividend Yield", f"{div*100:.2f}%" if div else "N/A")
+        st.metric("Dividend Yield", fmt_pct(m.get("dividend_yield")))
 
     col5, col6, col7, col8 = st.columns(4)
     with col5:
-        st.metric("52W High", f"₹{info.get('fiftyTwoWeekHigh','N/A'):,.2f}" if info.get('fiftyTwoWeekHigh') else "N/A")
+        st.metric("52W High", fmt_price(m.get("week52_high")))
     with col6:
-        st.metric("52W Low", f"₹{info.get('fiftyTwoWeekLow','N/A'):,.2f}" if info.get('fiftyTwoWeekLow') else "N/A")
+        st.metric("52W Low", fmt_price(m.get("week52_low")))
     with col7:
-        roe = info.get('returnOnEquity')
+        roe = m.get("roe")
         st.metric("ROE", f"{roe*100:.1f}%" if roe else "N/A")
     with col8:
-        beta = info.get('beta')
+        beta = m.get("beta")
         st.metric("Beta", f"{beta:.2f}" if beta else "N/A")
 
     # AI Analysis
@@ -412,45 +354,7 @@ elif page == "🔍 Company Deep Dive":
 - [🔍 Economic Times](https://economictimes.indiatimes.com/{c['mc'].replace('-','_')}/stocks/companyid-{c['screener']}.cms)
         """)
 
-    # Price chart
-    st.markdown("---")
-    period = st.selectbox("Chart period", ["1mo", "3mo", "6mo", "1y", "2y"], index=2)
-    period_days = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "2y": 730}
-    with st.spinner("Loading chart..."):
-        hist_period = fetch_history(c['ticker'], days=period_days[period])
-
-    if not hist_period.empty:
-        fig = go.Figure()
-        fig.add_trace(go.Candlestick(
-            x=hist_period.index,
-            open=hist_period['Open'], high=hist_period['High'],
-            low=hist_period['Low'], close=hist_period['Close'],
-            name="Price",
-        ))
-        fig.add_trace(go.Bar(
-            x=hist_period.index, y=hist_period['Volume'],
-            name="Volume", yaxis="y2",
-            marker_color="rgba(59,130,246,0.3)",
-        ))
-        fig.update_layout(
-            title=f"{c['name']} — Price Chart",
-            yaxis2=dict(overlaying='y', side='right', showgrid=False),
-            plot_bgcolor="#0f1117", paper_bgcolor="#0f1117",
-            font_color="#e2e8f0",
-            xaxis=dict(gridcolor="#1e2132"),
-            yaxis=dict(gridcolor="#1e2132"),
-            height=450,
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("Could not fetch chart data for this ticker.")
-
-    # Company description
-    desc = info.get('longBusinessSummary')
-    if desc:
-        st.markdown("---")
-        st.markdown("### 🏢 Company Overview")
-        st.markdown(desc)
+    st.info("📌 Charts require live market data. Use the NSE/Yahoo Finance links above to view price charts.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -500,42 +404,30 @@ elif page == "💼 Portfolio Allocator":
 # PAGE: LIVE CHARTS
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "📈 Live Charts":
-    st.title("📈 Live Price Comparison")
+    st.title("📈 Price Snapshot")
+    st.info("📌 Live price charts require a market data API. Use the links below to view charts on NSE/Yahoo Finance.")
 
     selected_companies = st.multiselect(
-        "Select companies to compare",
+        "Select companies",
         [c["name"] for c in COMPANIES],
-        default=[c["name"] for c in COMPANIES[:5]]
+        default=[c["name"] for c in COMPANIES[:10]]
     )
-    period = st.select_slider("Period", ["1mo","3mo","6mo","1y","2y"], value="6mo")
-    period_days = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "2y": 730}
 
     if selected_companies:
-        fig = go.Figure()
-        with st.spinner("Fetching live data..."):
-            for name in selected_companies:
-                c = next((x for x in COMPANIES if x["name"] == name), None)
-                if c:
-                    hist = fetch_history(c['ticker'], days=period_days[period])
-                    if not hist.empty:
-                        # Normalise to 100 for comparison
-                        normalised = (hist['Close'] / hist['Close'].iloc[0]) * 100
-                        fig.add_trace(go.Scatter(
-                            x=hist.index, y=normalised,
-                            name=name, mode='lines',
-                        ))
-        fig.update_layout(
-            title="Normalised Price Performance (Base = 100)",
-            yaxis_title="Indexed Price",
-            plot_bgcolor="#0f1117", paper_bgcolor="#0f1117",
-            font_color="#e2e8f0",
-            xaxis=dict(gridcolor="#1e2132"),
-            yaxis=dict(gridcolor="#1e2132"),
-            height=500,
-            hovermode="x unified",
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption("Normalised to 100 at start of period for easy comparison.")
+        rows = []
+        for name in selected_companies:
+            m = get_company_metrics(name)
+            rows.append({
+                "Company": name,
+                "Price (₹)": fmt_price(m.get("price")),
+                "Change %": f"{m.get('change_pct'):+.2f}%" if m.get("change_pct") is not None else "N/A",
+                "52W High": fmt_price(m.get("week52_high")),
+                "52W Low":  fmt_price(m.get("week52_low")),
+                "P/E":      fmt_ratio(m.get("pe_ratio")),
+                "Market Cap": fmt_cap(m.get("market_cap")),
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.caption(f"Data fetched during last crew run: {AI_GENERATED}")
     else:
         st.info("Select at least one company above.")
 
