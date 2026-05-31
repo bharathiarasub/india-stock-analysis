@@ -33,6 +33,10 @@ TICKER_MAP = {
     "Titan Company":                "TITAN.NS",
     "UltraTech Cement":             "ULTRACEMCO.NS",
     "JSW Steel":                    "JSWSTEEL.NS",
+    "HCL Technologies":             "HCLTECH.NS",
+    "Larsen & Toubro":              "LT.NS",
+    "Oil & Natural Gas Corp":       "ONGC.NS",
+    "Adani Ports & SEZ":            "ADANIPORTS.NS",
 }
 
 def fetch_stock_metrics(name: str) -> dict:
